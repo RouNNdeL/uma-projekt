@@ -1,9 +1,13 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, abstractstaticmethod 
-from regtree.utils import neighbor_avg
+
 import typing
-import numpy as np
+from abc import ABC, abstractmethod
 from math import floor
+
+import numpy as np
+
+from regtree.utils import neighbor_avg
+
 
 class RandomForest():
     data: np.ndarray
@@ -16,22 +20,37 @@ class RandomForest():
         self.trees = []
         for _ in range(tree_count):
             data_points = self.data[np.random.choice(self.data.shape[0], sample_size, replace=False)]
-            tree = RegressionTree.fit(data_points)
+            tree = RegressionTree.fit(data_points, 0.34)
             self.trees.append(tree)
 
-    def predict(self, attributes:np.ndarray) -> np.float64:
+    def generate_trees_feedback(self, tree_count, sample_size) -> None:
+        self.trees = []
+        data_points = self.data[np.random.choice(self.data.shape[0], sample_size, replace=False)]
+        for _ in range(tree_count):
+            tree = RegressionTree.fit(data_points, 1)
+            self.trees.append(tree)
+            data_points = self.get_worst_bootstrap(self.data)[:sample_size]
+
+    def predict(self, attributes: np.ndarray) -> np.float64:
         a = []
         for t in self.trees:
             a.append(t.predict(attributes))
         return np.array(a).mean()
 
-    def perform(self, data:np.ndarray) -> np.float64:
+    def perform(self, data: np.ndarray) -> np.float64:
         predicted = []
         for d in data:
             predicted.append(self.predict(d[1:]))
+        return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
 
-        print(predicted)
-        return (np.abs((data[:,0] - predicted) / data[:,0])).mean()
+    def get_worst_bootstrap(self, data: np.ndarray) -> np.ndarray:
+        bootstraps = []
+        for d in data:
+            predicted = self.predict(d[1:])
+            bootstraps.append((abs((d[0] - predicted) / d[0]), d))
+        # sort bootstraps by error descending
+        bootstraps.sort(key=lambda x: x[0], reverse=True)
+        return np.array([b[1] for b in bootstraps])
 
 
 class RegressionTree():
@@ -65,7 +84,7 @@ class RegressionTree():
         return RegressionTree(root)
 
     @staticmethod
-    def fit(array: np.ndarray, attr_incl:float=1):
+    def fit(array: np.ndarray, attr_incl: float = 1):
         root = RegressionNode.make_tree(array, attr_incl)
         if root is None:
             raise ValueError("Empty tree")
@@ -79,7 +98,7 @@ class RegressionElement(ABC):
         pass
 
     @abstractmethod
-    def pretty(self, o:int = 0) -> str:
+    def pretty(self, o: int = 0) -> str:
         pass
 
     @abstractmethod
@@ -99,7 +118,7 @@ class RegressionElement(ABC):
         if d['type'] == 'node':
             node = RegressionNode(d['attr'], d['value'])
             node.children = (
-                RegressionNode.from_dict(d['children'][0]), 
+                RegressionNode.from_dict(d['children'][0]),
                 RegressionNode.from_dict(d['children'][0])
             )
             return node
@@ -108,30 +127,26 @@ class RegressionElement(ABC):
         else:
             raise ValueError("Unknown regression tree type")
 
+
 class RegressionLeaf(RegressionElement):
     value: np.float64
 
     def __init__(self, value: np.float64) -> None:
         self.value = value
 
-
     def __str__(self) -> str:
         return f"RegressionLeaf[v={self.value}]"
-
 
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
 
-
     def __repr__(self) -> str:
         return self.__str__()
-
 
     def predict(self, attributes: np.ndarray) -> np.float64:
         return self.value
 
-
-    def pretty(self, o:int=0) -> str:
+    def pretty(self, o: int = 0) -> str:
         v = str(self.value)[:7]
         if len(v) & 1 == 1:
             if "." in v:
@@ -141,17 +156,15 @@ class RegressionLeaf(RegressionElement):
         i = round((8 - len(v)) / 2)
 
         s = ""
-        s += " " * o + "|== Leaf ==|"               + " " * o + "\n" + \
-             " " * o + "| " + " " * i + v + " " * i +" |" + " " * o + "\n" + \
-             " " * o + "|==========|"               + " " * o + "\n" + \
+        s += " " * o + "|== Leaf ==|" + " " * o + "\n" + \
+             " " * o + "| " + " " * i + v + " " * i + " |" + " " * o + "\n" + \
+             " " * o + "|==========|" + " " * o + "\n" + \
              " " * (2 * o + 12) + "\n"
 
         return s
 
-
     def child_count(self) -> int:
         return 0
-
 
     def depth(self) -> int:
         return 1
@@ -175,18 +188,14 @@ class RegressionNode(RegressionElement):
         self.attr = attr
         self.value = value
 
-
     def __str__(self) -> str:
         return f"RegressionNode[a={self.attr}, v={self.value}, c={self.children}]"
-
 
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
 
-
     def __repr__(self) -> str:
         return self.__str__()
-
 
     def split(self, array: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray]:
         if array.shape[1] <= self.attr:
@@ -208,8 +217,7 @@ class RegressionNode(RegressionElement):
 
         return np.square(np.concatenate([split1 - sigma1, split2 - sigma2])).mean()
 
-
-    def create_nodes(self, array: np.ndarray, attr_incl:float=1) -> None:
+    def create_nodes(self, array: np.ndarray, attr_incl: float = 1) -> None:
         split = self.split(array)
 
         node_l = RegressionNode.best_split(split[0], attr_incl)
@@ -227,14 +235,12 @@ class RegressionNode(RegressionElement):
 
         self.children = (node_l, node_r)
 
-
     def predict(self, attributes: np.ndarray) -> np.float64:
         if attributes[self.attr - 1] <= self.value:
             return self.children[0].predict(attributes)
         return self.children[1].predict(attributes)
 
-
-    def pretty(self, o:int = 0) -> str:
+    def pretty(self, o: int = 0) -> str:
         v1 = f"a={self.attr}"
         if len(v1) & 1 == 1:
             if "." in v1:
@@ -251,10 +257,10 @@ class RegressionNode(RegressionElement):
         i2 = round((8 - len(v2)) / 2)
 
         s = ""
-        s += " " * o + "|== Node ==|" +               " " * o + "\n" + \
-             " " * o + "| " + " " * i1 + v1 + " " * i1 +" |" + " " * o + "\n" + \
-             " " * o + "| " + " " * i2 + v2 + " " * i2 +" |" + " " * o + "\n" + \
-             " " * o + "|==========|" +               " " * o + "\n"
+        s += " " * o + "|== Node ==|" + " " * o + "\n" + \
+             " " * o + "| " + " " * i1 + v1 + " " * i1 + " |" + " " * o + "\n" + \
+             " " * o + "| " + " " * i2 + v2 + " " * i2 + " |" + " " * o + "\n" + \
+             " " * o + "|==========|" + " " * o + "\n"
 
         c1 = self.children[0].pretty(floor((o - 6) / 2))
         c2 = self.children[1].pretty(floor((o - 6) / 2))
@@ -265,7 +271,6 @@ class RegressionNode(RegressionElement):
         m = max(len(cs1), len(cs2))
         cs1 += [""] * (m - len(cs1))
         cs2 += [""] * (m - len(cs2))
-
 
         s += "\n".join(["".join(x) for x in list(zip(cs1, cs2))])
 
@@ -288,9 +293,8 @@ class RegressionNode(RegressionElement):
             ]
         }
 
-
     @staticmethod
-    def best_split(array: np.ndarray, attr_incl:float=1) -> RegressionNode | None:
+    def best_split(array: np.ndarray, attr_incl: float = 1) -> RegressionNode | None:
         best = (np.Infinity, None)
 
         attrc = max(1, round((array.shape[1] - 1) * attr_incl))
@@ -306,7 +310,7 @@ class RegressionNode(RegressionElement):
         return best[1]
 
     @staticmethod
-    def make_tree(array: np.ndarray, attr_incl:float=1) -> RegressionNode | None:
+    def make_tree(array: np.ndarray, attr_incl: float = 1) -> RegressionNode | None:
         root = RegressionNode.best_split(array, attr_incl)
         if root is None:
             return None
@@ -314,4 +318,3 @@ class RegressionNode(RegressionElement):
         root.create_nodes(array, attr_incl)
 
         return root
-
