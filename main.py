@@ -9,7 +9,7 @@ import time
 
 def main():
     # index 0 is the value, the rest are the attributes
-    a = load_data_from_csv("cal_housing.data")
+    a = load_data_from_csv("data/cal_housing.data")
 
     # shuffle the data
     np.random.shuffle(a)
