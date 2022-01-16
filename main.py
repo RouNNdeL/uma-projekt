@@ -51,23 +51,7 @@ def main():
     testing = a[int(len(a) * 0.66) :]
 
     # Model testing
-    check(training, testing, False, 25, 1000, 3, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 4, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 5, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 6, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 7, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 8, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 9, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 10, 0.34)
-    print("\n=======================\n")
-    check(training, testing, False, 25, 1000, 0, 0.34)
+    check(training, testing, True, 50, 1000, 7, 0.34)
     print("\n=======================\n")
 
 

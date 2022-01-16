@@ -1,11 +1,13 @@
 from __future__ import annotations
+from time import perf_counter
 
+from regtree.utils import NpEncoder, neighbor_avg
 from typing import Dict, Tuple, List, Any
 from abc import ABC, abstractmethod
+from sys import stdout
 
 import numpy as np
-
-from regtree.utils import neighbor_avg
+import json
 
 
 class RandomForest:
@@ -34,20 +36,19 @@ class RandomForest:
     def perform(self, data: np.ndarray) -> np.float64:
         predicted = []
         for d in data:
-            predicted.append(self.predict(d[1:]))
+            predicted.append(self.predict(d))
         return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
 
     def to_dict(self) -> Dict[str, Any]:
         return {"trees": [t.to_dict() for t in self.__trees]}
 
-    def __worst_bootstrap(self, data: np.ndarray) -> np.ndarray:
-        bootstraps: List[Tuple[np.float64, np.ndarray]] = []
-        for d in data:
-            predicted = self.predict(d[1:])
-            bootstraps.append((abs((d[0] - predicted) / d[0]), d))
-        # sort bootstraps by error descending
-        bootstraps.sort(key=lambda x: x[0], reverse=True)
-        return np.array([b[1] for b in bootstraps])
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), cls=NpEncoder)
+
+    def __best_performers(self, data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        predictions = np.apply_along_axis(self.predict, 1, data)
+        performance = np.abs(data[:, 0] - predictions) / data[:, 0]
+        return (performance, data[performance.argsort()])
 
     def __fit_normal(
         self,
@@ -58,12 +59,16 @@ class RandomForest:
         attr_incl: float,
     ) -> None:
         self.__trees = []
-        for _ in range(tree_count):
+        for i in range(tree_count):
             data_points = data[
                 np.random.choice(data.shape[0], sample_size, replace=False)
             ]
             tree = RegressionTree.fit(data_points, max_depth, attr_incl)
             self.__trees.append(tree)
+            stdout.write(f"\r- tree: {i + 1}")
+            stdout.flush()
+        stdout.write(f"\r")
+        stdout.flush()
 
     def __fit_feedback(
         self,
@@ -75,10 +80,17 @@ class RandomForest:
     ) -> None:
         self.__trees = []
         data_points = data[np.random.choice(data.shape[0], sample_size, replace=False)]
-        for _ in range(tree_count):
+        for i in range(tree_count):
             tree = RegressionTree.fit(data_points, max_depth, attr_incl)
             self.__trees.append(tree)
-            data_points = self.__worst_bootstrap(data)[:sample_size]
+            performance = self.__best_performers(data)
+            data_points = performance[1][-sample_size:]
+            stdout.write(
+                f"\r- tree: {i + 1} perf: {round(performance[0].mean(), 2)}%  "
+            )
+            stdout.flush()
+        stdout.write(f"\r")
+        stdout.flush()
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> RandomForest:
@@ -138,8 +150,8 @@ class RegressionElement(ABC):
         if d["type"] == "node":
             node = RegressionNode(d["attr"], d["value"], depth, 0)
             node.__children = (
-                RegressionNode.from_dict(d["children"][0], depth + 1),
-                RegressionNode.from_dict(d["children"][1], depth + 1),
+                RegressionNode.from_dict(d["childl"], depth + 1),
+                RegressionNode.from_dict(d["childr"], depth + 1),
             )
             return node
         elif d["type"] == "leaf":
@@ -240,7 +252,7 @@ class RegressionNode(RegressionElement):
         self.__children = (node_l, node_r)
 
     def predict(self, attributes: np.ndarray) -> np.float64:
-        if attributes[self.__attr - 1] <= self.__value:
+        if attributes[self.__attr] <= self.__value:
             return self.__children[0].predict(attributes)
         return self.__children[1].predict(attributes)
 
@@ -249,7 +261,8 @@ class RegressionNode(RegressionElement):
             "type": "node",
             "attr": self.__attr,
             "value": self.__value,
-            "children": [self.__children[0].to_dict(), self.__children[1].to_dict()],
+            "childl": self.__children[0].to_dict(),
+            "childr": self.__children[1].to_dict(),
         }
 
     @staticmethod

@@ -4,7 +4,7 @@ import numpy as np
 
 
 def load_data_from_csv(path):
-    with open(path, 'r') as csv_file:
+    with open(path, "r") as csv_file:
         csv_reader = csv.reader(csv_file)
         next(csv_reader)
         data = []
