@@ -1,29 +1,30 @@
 from __future__ import annotations
-from time import perf_counter
 
-from regtree.utils import NpEncoder, neighbor_avg
-from typing import Dict, Tuple, List, Any
+import json
 from abc import ABC, abstractmethod
 from sys import stdout
+from typing import Dict, Tuple, List, Any
 
 import numpy as np
-import json
+
+from regtree.utils import NpEncoder, neighbor_avg
 
 
 class RandomForest:
     __trees: List[RegressionTree]
 
     def fit(
-        self,
-        use_feedback: bool,
-        data: np.ndarray,
-        tree_count: int,
-        sample_size: int,
-        max_depth: int = 0,
-        attr_incl: float = 1.0,
+            self,
+            use_feedback: bool,
+            data: np.ndarray,
+            tree_count: int,
+            sample_size: int,
+            max_depth: int = 0,
+            attr_incl: float = 1.0,
+            percentage=True,
     ) -> None:
         if use_feedback:
-            self.__fit_feedback(data, tree_count, sample_size, max_depth, attr_incl)
+            self.__fit_feedback(data, tree_count, sample_size, max_depth, attr_incl, percentage)
         else:
             self.__fit_normal(data, tree_count, sample_size, max_depth, attr_incl)
 
@@ -33,11 +34,13 @@ class RandomForest:
             a.append(t.predict(attributes))
         return np.array(a).mean()
 
-    def perform(self, data: np.ndarray) -> np.float64:
+    def perform(self, data: np.ndarray, percentage=True) -> np.float64:
         predicted = []
         for d in data:
             predicted.append(self.predict(d))
-        return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
+        if percentage:
+            return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
+        return (np.abs(data[:, 0] - predicted)).mean()
 
     def to_dict(self) -> Dict[str, Any]:
         return {"trees": [t.to_dict() for t in self.__trees]}
@@ -45,18 +48,25 @@ class RandomForest:
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), cls=NpEncoder)
 
-    def __best_performers(self, data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def __best_performers(self, data: np.ndarray, n: int, percentage=True) -> Tuple[np.float64, np.ndarray]:
         predictions = np.apply_along_axis(self.predict, 1, data)
-        performance = np.abs(data[:, 0] - predictions) / data[:, 0]
-        return (performance, data[performance.argsort()])
+        if percentage:
+            performance = np.abs(data[:, 0] - predictions) / data[:, 0]
+        else:
+            performance = np.abs(data[:, 0] - predictions)
+        # choose the worst performing trees randomly with weighting
+        # based on the performance
+        worst = np.random.choice(data.shape[0], n, False, performance / performance.sum())
+
+        return performance.mean(), data[worst]
 
     def __fit_normal(
-        self,
-        data: np.ndarray,
-        tree_count: int,
-        sample_size: int,
-        max_depth: int,
-        attr_incl: float,
+            self,
+            data: np.ndarray,
+            tree_count: int,
+            sample_size: int,
+            max_depth: int,
+            attr_incl: float,
     ) -> None:
         self.__trees = []
         for i in range(tree_count):
@@ -71,22 +81,23 @@ class RandomForest:
         stdout.flush()
 
     def __fit_feedback(
-        self,
-        data: np.ndarray,
-        tree_count: int,
-        sample_size: int,
-        max_depth: int,
-        attr_incl: float,
+            self,
+            data: np.ndarray,
+            tree_count: int,
+            sample_size: int,
+            max_depth: int,
+            attr_incl: float,
+            percentage=True,
     ) -> None:
         self.__trees = []
         data_points = data[np.random.choice(data.shape[0], sample_size, replace=False)]
         for i in range(tree_count):
             tree = RegressionTree.fit(data_points, max_depth, attr_incl)
             self.__trees.append(tree)
-            performance = self.__best_performers(data)
-            data_points = performance[1][-sample_size:]
+            performance = self.__best_performers(data, sample_size, percentage)
+            data_points = performance[1]
             stdout.write(
-                f"\r- tree: {i + 1} perf: {round(performance[0].mean(), 2)}%  "
+                f"\r- tree: {i + 1} perf: {round(performance[0].mean(), 2)}  "
             )
             stdout.flush()
         stdout.write(f"\r")
@@ -122,7 +133,7 @@ class RegressionTree:
     @staticmethod
     def from_dict(d):
         root = RegressionElement.from_dict(d)
-        if root is not RegressionNode:
+        if not isinstance(root, RegressionNode):
             raise ValueError("Root has to be a node")
 
         return RegressionTree(root)
@@ -148,11 +159,10 @@ class RegressionElement(ABC):
     @staticmethod
     def from_dict(d, depth: int = 0) -> RegressionElement:
         if d["type"] == "node":
-            node = RegressionNode(d["attr"], d["value"], depth, 0)
-            node.__children = (
+            node = RegressionNode(d["attr"], d["value"], depth, 0, (
                 RegressionNode.from_dict(d["childl"], depth + 1),
                 RegressionNode.from_dict(d["childr"], depth + 1),
-            )
+            ))
             return node
         elif d["type"] == "leaf":
             return RegressionLeaf(d["value"])
@@ -190,7 +200,8 @@ class RegressionNode(RegressionElement):
     __max_depth: int
 
     def __init__(
-        self, attr: int, value: np.float64, depth: int, max_depth: int
+            self, attr: int, value: np.float64, depth: int, max_depth: int,
+            children: Tuple[RegressionElement, RegressionElement] = None
     ) -> None:
         if attr < 1:
             raise ValueError("Attributes start from index 1")
@@ -199,6 +210,7 @@ class RegressionNode(RegressionElement):
         self.__value = value
         self.__depth = depth
         self.__max_depth = max_depth
+        self.__children = children
 
     def __str__(self) -> str:
         return f"RegressionNode[a={self.__attr}, v={self.__value}, c={self.__children}]"
@@ -267,9 +279,9 @@ class RegressionNode(RegressionElement):
 
     @staticmethod
     def best_split(
-        array: np.ndarray, depth: int, max_depth: int, attr_incl: float
+            array: np.ndarray, depth: int, max_depth: int, attr_incl: float
     ) -> RegressionNode | None:
-        if max_depth > 0 and depth > max_depth:
+        if 0 < max_depth < depth:
             return None
 
         best = (np.Infinity, None)
@@ -288,7 +300,7 @@ class RegressionNode(RegressionElement):
 
     @staticmethod
     def make_tree(
-        array: np.ndarray, max_depth: int, attr_incl: float
+            array: np.ndarray, max_depth: int, attr_incl: float
     ) -> RegressionNode | None:
         root = RegressionNode.best_split(array, 0, max_depth, attr_incl)
         if root is None:
