@@ -154,3 +154,4 @@ cython_debug/
 data/tracks_processed.csv
 data/tracks_processed_fix.csv
 data/tracks_processed.domain
+*.json

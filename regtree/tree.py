@@ -1,13 +1,13 @@
 from __future__ import annotations
-from time import perf_counter
 
-from regtree.utils import NpEncoder, neighbor_avg
-from typing import Dict, Tuple, List, Any
+import json
 from abc import ABC, abstractmethod
 from sys import stdout
+from typing import Dict, Tuple, List, Any
 
 import numpy as np
-import json
+
+from regtree.utils import NpEncoder, neighbor_avg
 
 
 class RandomForest:
@@ -133,7 +133,7 @@ class RegressionTree:
     @staticmethod
     def from_dict(d):
         root = RegressionElement.from_dict(d)
-        if root is not RegressionNode:
+        if not isinstance(root, RegressionNode):
             raise ValueError("Root has to be a node")
 
         return RegressionTree(root)
@@ -159,11 +159,10 @@ class RegressionElement(ABC):
     @staticmethod
     def from_dict(d, depth: int = 0) -> RegressionElement:
         if d["type"] == "node":
-            node = RegressionNode(d["attr"], d["value"], depth, 0)
-            node.__children = (
+            node = RegressionNode(d["attr"], d["value"], depth, 0, (
                 RegressionNode.from_dict(d["childl"], depth + 1),
                 RegressionNode.from_dict(d["childr"], depth + 1),
-            )
+            ))
             return node
         elif d["type"] == "leaf":
             return RegressionLeaf(d["value"])
@@ -201,7 +200,8 @@ class RegressionNode(RegressionElement):
     __max_depth: int
 
     def __init__(
-            self, attr: int, value: np.float64, depth: int, max_depth: int
+            self, attr: int, value: np.float64, depth: int, max_depth: int,
+            children: Tuple[RegressionElement, RegressionElement] = None
     ) -> None:
         if attr < 1:
             raise ValueError("Attributes start from index 1")
@@ -210,6 +210,7 @@ class RegressionNode(RegressionElement):
         self.__value = value
         self.__depth = depth
         self.__max_depth = max_depth
+        self.__children = children
 
     def __str__(self) -> str:
         return f"RegressionNode[a={self.__attr}, v={self.__value}, c={self.__children}]"

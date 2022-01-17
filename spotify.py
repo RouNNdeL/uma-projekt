@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # dataset: https://www.kaggle.com/lehaknarnauli/spotify-datasets
-
-
+import json
 import time
 
 import numpy
@@ -30,6 +29,8 @@ def check(
     tic = time.perf_counter()
     forest = RandomForest()
     forest.fit(feedback, train, trees, samples, max_depth, attr_incl, False)
+    # with open('json_data.json') as file:
+    #     forest = RandomForest.from_dict(json.load(file))
     tac = time.perf_counter()
     print(f"Finished training in: {round(tac - tic, 1)}s")
 
@@ -39,6 +40,8 @@ def check(
     tic = time.perf_counter()
     p = forest.perform(test, False)
     tac = time.perf_counter()
+    with open('json_data.json', 'w') as outfile:
+        outfile.write(forest.to_json())
 
     print(f"Finished testing in: {round(tac - tic, 1)}s")
     print(f"Avg. error: {round(p, 1)}")
@@ -67,13 +70,13 @@ def main():
 
     # split the data into training and testing
     dataset_len = len(a)
-    training_size = 0.1
+    training_size = 0.6
     testing_size = 0.07
     training = a[: int(dataset_len * training_size)]
     testing = a[int(dataset_len * training_size): int(dataset_len * (testing_size + training_size))]
 
     # Model testing
-    check(training, testing, True, 20, 5000, 10, 0.34)
+    check(training, testing, True, 50, 5000, 10, 0.34)
     print("\n=======================\n")
 
 
