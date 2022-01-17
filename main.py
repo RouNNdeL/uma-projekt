@@ -51,7 +51,7 @@ def main():
     testing = a[int(len(a) * 0.66) :]
 
     # Model testing
-    check(training, testing, True, 50, 1000, 7, 0.34)
+    check(training, testing, True, 50, 1000, 9, 0.34)
     print("\n=======================\n")
 
 
