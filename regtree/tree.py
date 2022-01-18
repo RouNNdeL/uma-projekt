@@ -113,6 +113,10 @@ class RandomForest:
         forest.__trees = trees
         return forest
 
+    @staticmethod
+    def from_json(s: str) -> RandomForest:
+        return RandomForest.from_dict(json.loads(s))
+
 
 class RegressionTree:
     __root: RegressionNode
