@@ -60,10 +60,24 @@ def main():
     a = a[a[:, 0] >= 1950]
 
     # remove outliers based on standard deviation in all columns
-    for i in range(1, len(a[0])):
-        mean = np.mean(a[:, i])
-        std = np.std(a[:, i])
-        a = a[np.abs(a[:, i] - mean) < 3 * std]
+    # for i in range(1, len(a[0])):
+    #     mean = np.mean(a[:, i])
+    #     std = np.std(a[:, i])
+    #     a = a[np.abs(a[:, i] - mean) < 3 * std]
+
+    # sort by year
+    a = a[a[:, 0].argsort()]
+
+    # group by year
+    a = np.split(a, np.where(np.diff(a[:, 0]))[0] + 1)
+
+    # ensure that each year has the same number of entries by oversampling
+    for i in range(len(a)):
+        b = np.random.choice(a[i].shape[0], 2500, replace=True)
+        a[i] = a[i][b]
+
+    # flatten
+    a = np.concatenate(a)
 
     # shuffle the data
     np.random.shuffle(a)
