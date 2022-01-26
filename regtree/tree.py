@@ -23,21 +23,33 @@ class RandomForest:
             attr_incl: float = 1.0,
             percentage=True,
     ) -> None:
+        if data.shape[0] < sample_size:
+            raise ValueError("The dataset is smaller then the sample size")
+
         if use_feedback:
             self.__fit_feedback(data, tree_count, sample_size, max_depth, attr_incl, percentage)
         else:
             self.__fit_normal(data, tree_count, sample_size, max_depth, attr_incl)
 
-    def predict(self, attributes: np.ndarray) -> np.float64:
+    def predict_all(self, attributes: np.ndarray) -> np.ndarray:
         a = []
         for t in self.__trees:
             a.append(t.predict(attributes))
-        return np.array(a).mean()
+        return np.array(a)
 
-    def perform(self, data: np.ndarray, percentage=True) -> np.float64:
+    def predict_median(self, attributes: np.ndarray) -> np.float64:
+        return np.median(self.predict_all(attributes))
+
+    def predict(self, attributes: np.ndarray) -> np.float64:
+        return self.predict_all(attributes).mean()
+
+    def perform(self, data: np.ndarray, percentage=True, median=False) -> np.float64:
         predicted = []
         for d in data:
-            predicted.append(self.predict(d))
+            if median:
+                predicted.append(self.predict_median(d))
+            else:
+                predicted.append(self.predict(d))
         if percentage:
             return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
         return (np.abs(data[:, 0] - predicted)).mean()
@@ -134,6 +146,14 @@ class RegressionTree:
 
     def predict(self, attributes: np.ndarray) -> np.float64:
         return self.__root.predict(attributes)
+
+    def perform(self, data: np.ndarray, percentage=True) -> np.float64:
+        predicted = []
+        for d in data:
+            predicted.append(self.predict(d))
+        if percentage:
+            return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
+        return (np.abs(data[:, 0] - predicted)).mean()
 
     def to_dict(self):
         return self.__root.to_dict()
