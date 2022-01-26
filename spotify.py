@@ -40,8 +40,8 @@ def check(
     tic = time.perf_counter()
     p = forest.perform(test, False)
     tac = time.perf_counter()
-    with open('json_data.json', 'w') as outfile:
-        outfile.write(forest.to_json())
+    # with open('json_data.json', 'w') as outfile:
+    #     outfile.write(forest.to_json())
 
     print(f"Finished testing in: {round(tac - tic, 1)}s")
     print(f"Avg. error: {round(p, 1)}")
