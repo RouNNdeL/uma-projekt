@@ -289,7 +289,12 @@ class RegressionNode(RegressionElement):
     def best_split(
             array: np.ndarray, depth: int, max_depth: int, attr_incl: float
     ) -> RegressionNode | None:
+        # Max depth exceeded
         if 0 < max_depth < depth:
+            return None
+
+        # No unique values below, no information can be gained by spliting (pruning)
+        if np.unique(array[:, 0].round(7)).size == 1:
             return None
 
         best = (np.Infinity, None)
