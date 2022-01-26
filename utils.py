@@ -3,9 +3,9 @@ import csv
 import numpy as np
 
 
-def load_data_from_csv(path):
+def load_data_from_csv(path, delimiter=","):
     with open(path, "r") as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=";")
+        csv_reader = csv.reader(csv_file, delimiter=delimiter)
         next(csv_reader)
         data = []
         for row in csv_reader:

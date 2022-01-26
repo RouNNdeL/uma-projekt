@@ -203,7 +203,7 @@ class RegressionLeaf(RegressionElement):
 class RegressionNode(RegressionElement):
     __attr: int
     __value: np.float64
-    __children: Tuple[RegressionElement, RegressionElement]
+    __children: Tuple[RegressionElement, RegressionElement] | None
     __depth: int
     __max_depth: int
 
