@@ -54,6 +54,10 @@ class RandomForest:
             performance = np.abs(data[:, 0] - predictions) / data[:, 0]
         else:
             performance = np.abs(data[:, 0] - predictions)
+
+        # add the smallest possible value to the performance to avoid zero chance of choosing a tree
+        performance = performance + np.finfo(float).eps
+
         # choose the worst performing trees randomly with weighting
         # based on the performance
         worst = np.random.choice(data.shape[0], n, False, performance / performance.sum())

@@ -41,7 +41,7 @@ def check(
 
 def main():
     # index 0 is the value, the rest are the attributes
-    a = load_data_from_csv("data/cal_housing.data")
+    a = load_data_from_csv("data/winequality-red.csv")
 
     # shuffle the data
     np.random.shuffle(a)
@@ -51,7 +51,7 @@ def main():
     testing = a[int(len(a) * 0.66) :]
 
     # Model testing
-    check(training, testing, True, 50, 1000, 9, 0.34)
+    check(training, testing, True, 10, 500, 0, 0.34)
     print("\n=======================\n")
 
 
