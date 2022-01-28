@@ -43,16 +43,23 @@ class RandomForest:
     def predict(self, attributes: np.ndarray) -> np.float64:
         return self.predict_all(attributes).mean()
 
-    def perform(self, data: np.ndarray, percentage=True, median=False) -> np.float64:
+    def perform(self, data: np.ndarray, percentage=True, median=False, rounded=False) -> np.float64:
         predicted = []
         for d in data:
             if median:
                 predicted.append(self.predict_median(d))
             else:
                 predicted.append(self.predict(d))
+
+        data_ = data[:, 0]
+
+        if rounded:
+            data_ = np.round(data_)
+            predicted = np.round(predicted)
+
         if percentage:
-            return (np.abs((data[:, 0] - predicted) / data[:, 0])).mean()
-        return (np.abs(data[:, 0] - predicted)).mean()
+            return (np.abs((data_ - predicted) / data_)).mean()
+        return (np.abs(data_ - predicted)).mean()
 
     def to_dict(self) -> Dict[str, Any]:
         return {"trees": [t.to_dict() for t in self.__trees]}
